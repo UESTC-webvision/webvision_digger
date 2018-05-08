@@ -3,7 +3,7 @@ import os
 import torch
 # import pandas as pd
 import random
-# from skimage import io, transform
+from skimage import io, transform
 import numpy as np
 # import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
@@ -15,12 +15,12 @@ VALID_PATH = './val_images_resized/'
 
 
 class webvisionData(Dataset):
-    def __init__(self, data_path, batch_size, kind, transform=None):
+    def __init__(self, data_path, kind, transform=None):
         self.data_path = data_path
-        self.batch_size = batch_size
+        self.transform = transform
         self.kind = kind
         self.fileListX, self.fileListY = [], []
-        self.start = 0
+
         self.load_list()
 
     def __getitem__(self, index): # 获取一个index
@@ -45,19 +45,20 @@ class webvisionData(Dataset):
         random.shuffle(zip_data)  #random is not defined ,import random   --CY
         self.fileListX, self.fileListY = zip(*zip_data)
 
-    def read_data(self, index): # 读取这部分item的X和Y的值
-        pic_label = []
-        input_x, input_y = self.fileListX[index], self.fileListY[index]
-        if (self.kind == 'train'):
-            img = Image.open(input_x)
+    def read_data(self, index):
+        img_name = self.fileListX[index]
+        if self.kind == 'train':
+            img_path = os.path.join('./', img_name)
         else:
-            img = Image.open(VALID_PATH+input_x)
-        img = img.resize((224, 224), Image.ANTIALIAS)
-        img = img.convert("RGB")
-        pic = np.asarray(img)
-        pic_label.append(input_y)
-        pic = torch.from_numpy(np.asarray(pic))
-        pic_label = torch.from_numpy(np.asarray(pic_label))
-        pic_label = torch.zeros(
-            1, CLASS_NUM).scatter_(1, pic_label.view(-1,1),1)  ##end-start+1  -》end-strat
-        return pic, pic_label
+            img_path = os.path.join(VALID_PATH, img_name)
+
+        with Image.open(img_path) as img:
+            image = img.convert('RGB')
+
+        image.resize((224, 224), Image.ANTIALIAS)
+        image = self.transform(image)
+
+        landmarks = torch.from_numpy(np.asarray([self.fileListY[index]]))
+        landmarks = torch.zeros(1, CLASS_NUM).scatter_(1, landmarks.view(-1,1),1)
+
+        return image, landmarks

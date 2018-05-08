@@ -39,8 +39,6 @@ BATCH_SZIE = 512
 
 print('==> Preparing data..')
 transform_train = transforms.Compose([
-    transforms.RandomCrop(32, padding=4),  # data augmentation is not necessary
-    transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
@@ -52,24 +50,11 @@ transform_test = transforms.Compose([
 # define my own dataset
 
 
-class My_dataset(Dataset):
-    def __init__(self, images, labels):
-        self.images = images
-        self.labels = labels
-
-    def __getitem__(self, index):  # 返回的是tensor
-        img, target = self.images[index], self.labels[index]
-        return img, target
-
-    def __len__(self):
-        return len(self.images)
-
-
-trainset = webvisionData(TRAIN_LIST_PATH, BATCH_SZIE, 'train')
+trainset = webvisionData(TRAIN_LIST_PATH, 'train', transform_train)
 train_loader = torch.utils.data.DataLoader(
     trainset, batch_size=BATCH_SZIE, shuffle=True, num_workers=2)
 
-testset = webvisionData(VALID_LIST_PATH, BATCH_SZIE, 'valid')
+testset = webvisionData(VALID_LIST_PATH, 'valid', transform_test)
 test_loader = torch.utils.data.DataLoader(
     testset, batch_size=BATCH_SZIE, shuffle=True, num_workers=2)
 
@@ -98,6 +83,10 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr,
 
 # Training
 
+def adjust_learning_rate(epoch):
+    lr = args.lr * (0.1 ** (epoch // 2))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
 
 def train(epoch):
     print('\nEpoch: %d' % epoch)
@@ -123,6 +112,9 @@ def train(epoch):
 
         progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                      % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
+
+        if idx == 50000: # 兄弟你看下
+            break
 
 
 def test(epoch):
@@ -161,6 +153,7 @@ def test(epoch):
         best_acc = acc
 
 
-for epoch in range(start_epoch, start_epoch+20):
+for epoch in range(start_epoch, start_epoch+10):
+    adjust_learning_rate(epoch)
     train(epoch)
     test(epoch)
