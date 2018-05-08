@@ -58,7 +58,4 @@ class webvisionData(Dataset):
         image.resize((224, 224), Image.ANTIALIAS)
         image = self.transform(image)
 
-        landmarks = torch.from_numpy(np.asarray([self.fileListY[index]]))
-        landmarks = torch.zeros(1, CLASS_NUM).scatter_(1, landmarks.view(-1,1),1)
-
-        return image, landmarks
+        return image, torch.Tensor(label)
