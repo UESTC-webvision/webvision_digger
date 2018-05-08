@@ -84,7 +84,7 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr,
 # Training
 
 def adjust_learning_rate(epoch):
-    lr = args.lr * (0.1 ** (epoch // 2))
+    lr = args.lr * (0.1 ** (epoch // 3))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -113,8 +113,6 @@ def train(epoch):
         progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
                      % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
 
-        if idx == 50000: # 兄弟你看下
-            break
 
 
 def test(epoch):
@@ -153,7 +151,7 @@ def test(epoch):
         best_acc = acc
 
 
-for epoch in range(start_epoch, start_epoch+10):
+for epoch in range(start_epoch, start_epoch+15):
     adjust_learning_rate(epoch)
     train(epoch)
     test(epoch)
