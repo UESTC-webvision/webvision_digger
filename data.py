@@ -2,6 +2,7 @@ from __future__ import print_function, division
 import os
 import torch
 # import pandas as pd
+from torch.autograd import Variable
 import random
 from skimage import io, transform
 import numpy as np
@@ -54,7 +55,7 @@ class webvisionData(Dataset):
 
         # with Image.open(img_path) as img:
         #    image = img.convert('RGB')
-        image = Image.open(image_name)
+        image = Image.open(img_path).convert('RGB')
         image = self.transform(image)
         image = np.array(image).astype('float32')
         image = self.transform(image)
