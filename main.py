@@ -18,6 +18,7 @@ from resnet import *
 from utils import progress_bar
 from torch.autograd import Variable
 from data import *
+from torchvision import transforms, utils
 
 
 parser = argparse.ArgumentParser(description='webvison2018')
@@ -39,7 +40,7 @@ BATCH_SZIE = 512
 
 print('==> Preparing data..')
 transform_train = transforms.Compose([
-    transforms.RandomSizedCrop(224),
+    transforms.RandomResizedCrop(224),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),

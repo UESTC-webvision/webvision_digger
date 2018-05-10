@@ -52,13 +52,13 @@ class webvisionData(Dataset):
         else:
             img_path = os.path.join(VALID_PATH, img_name)
 
-        image = io.imread(img_name)
-        image = image.convert('RGB')
-
+        with Image.open(img_path) as img:
+            image = img.convert('RGB')
         if self.kind == 'train':
             image.resize((256, 256), Image.ANTIALIAS)
         else:
             image.resize((224, 224), Image.ANTIALIAS)
+        image = np.array(image).astype('float32')
         image = self.transform(image)
 
         return image, torch.Tensor(label)
