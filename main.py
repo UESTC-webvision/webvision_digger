@@ -39,6 +39,8 @@ BATCH_SZIE = 512
 
 print('==> Preparing data..')
 transform_train = transforms.Compose([
+    transforms.RandomSizedCrop(224),
+    transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
@@ -52,11 +54,11 @@ transform_test = transforms.Compose([
 
 trainset = webvisionData(TRAIN_LIST_PATH, 'train', transform_train)
 train_loader = torch.utils.data.DataLoader(
-    trainset, batch_size=BATCH_SZIE, shuffle=True, num_workers=2)
+    trainset, batch_size=BATCH_SZIE, shuffle=True, num_workers=4)
 
 testset = webvisionData(VALID_LIST_PATH, 'valid', transform_test)
 test_loader = torch.utils.data.DataLoader(
-    testset, batch_size=BATCH_SZIE, shuffle=True, num_workers=2)
+    testset, batch_size=BATCH_SZIE, shuffle=True, num_workers=4)
 
 
 # Model
