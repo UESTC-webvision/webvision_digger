@@ -35,7 +35,7 @@ start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 #train_pathFile =  # how to conbine google and flickr?
 TRAIN_LIST_PATH = '../info/train_filelist_all.txt'
 VALID_LIST_PATH = '../info/val_filelist.txt'
-BATCH_SZIE = 32
+BATCH_SZIE = 16
 
 print('==> Preparing data..')
 transform_train = transforms.Compose([
@@ -88,7 +88,7 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr,
 # Training
 
 def adjust_learning_rate(epoch):
-    lr = args.lr * (0.1 ** (epoch // 3))
+    lr = args.lr * (0.1 ** (epoch // 2))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -155,7 +155,7 @@ def test(epoch):
         best_acc = acc
 
 
-for epoch in range(start_epoch, start_epoch+15):
+for epoch in range(start_epoch, start_epoch+10):
     adjust_learning_rate(epoch)
     train(epoch)
     test(epoch)
