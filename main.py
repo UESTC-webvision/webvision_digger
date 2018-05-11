@@ -28,15 +28,14 @@ parser.add_argument('--resume', '-r', action='store_true',
 args = parser.parse_args()
 
 use_cuda = torch.cuda.is_available()
-
 best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
 # data_path
 #train_pathFile =  # how to conbine google and flickr?
-TRAIN_LIST_PATH = './info/train_filelist_all.txt'
-VALID_LIST_PATH = './info/val_filelist.txt'
-BATCH_SZIE = 512
+TRAIN_LIST_PATH = '../info/train_filelist_all.txt'
+VALID_LIST_PATH = '../info/val_filelist.txt'
+BATCH_SZIE = 32
 
 print('==> Preparing data..')
 transform_train = transforms.Compose([
@@ -63,7 +62,7 @@ testset = webvisionData(VALID_LIST_PATH, 'valid', transform_test)
 test_loader = torch.utils.data.DataLoader(
     testset, batch_size=BATCH_SZIE, shuffle=True, num_workers=4)
 
-
+print(torch.cuda.device_count())
 # Model
 if args.resume:
     # Load checkpoint.
