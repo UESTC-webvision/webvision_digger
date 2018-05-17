@@ -13,7 +13,7 @@ import torchvision.transforms as transforms
 import os
 import argparse
 from resnet import *
-from data import *
+from data_test_cy import *
 #from utils import progress_bar # calculate time using
 from torch.autograd import Variable
 
@@ -72,11 +72,11 @@ transform_test = transforms.Compose([               #测试集合预处理
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]), #
 ])
 
-trainset = webvisionData(TRAIN_LIST_PATH, 'train', transform_train)
+trainset = webvisionData(TRAIN_LIST_PATH,'train', transform_train)
 trainloader = torch.utils.data.DataLoader(
     trainset, batch_size=BATCH_SZIE, shuffle=True, num_workers=32)   #生成一个迭代器
 
-testset = webvisionData(VALID_LIST_PATH, 'valid', transform_test)
+testset = webvisionData(VALID_LIST_PATH,'valid', transform_test)
 testloader = torch.utils.data.DataLoader(
     testset, batch_size=BATCH_SZIE, shuffle=True, num_workers=32)
 # learning rate decay
