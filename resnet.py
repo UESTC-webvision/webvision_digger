@@ -1,123 +1,155 @@
-'''ResNet in PyTorch.
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Jan 20 20:51:27 2018
+@author: junyang
+"""
 
-For Pre-activation ResNet, see 'preact_resnet.py'.
-
-Reference:
-[1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
-    Deep Residual Learning for Image Recognition. arXiv:1512.03385
-'''
+from __future__ import print_function
 import torch
 import torch.nn as nn
+from torch.nn import init
+# import pdb
+import numpy as np
+import torchvision.models as models
 import torch.nn.functional as F
 
-from torch.autograd import Variable
 
-
-class BasicBlock(nn.Module):
-    expansion = 1
-
-    def __init__(self, in_planes, planes, stride=1):
-        super(BasicBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
-
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion*planes:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.expansion*planes)
-            )
+class BasicConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super(BasicConv2d, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, bias=False, **kwargs)
+        self.bn = nn.BatchNorm2d(out_channels, eps=0.001)
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                init.kaiming_normal(m.weight.data, a=0, mode='fan_in')
+            elif isinstance(m, nn.BatchNorm2d):
+                init.normal(m.weight.data, 1.0, 0.02)
+                init.constant(m.bias.data, 0.0)
 
     def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
-        out += self.shortcut(x)
-        out = F.relu(out)
-        return out
+        x = self.conv(x)
+        # print('basic',x.size())
+        x = self.bn(x)
+        return F.relu(x, inplace=True)
 
 
-class Bottleneck(nn.Module):
-    expansion = 4
+class Inception(nn.Module):
+    def __init__(self, nc_in, nc_1x1, nc_3x3_reduce, nc_3x3, nc_double_3x3_reduce, nc_double_3x3_a, nc_double_3x3_b,
+                 nc_pool_conv):
+        super(Inception, self).__init__()
 
-    def __init__(self, in_planes, planes, stride=1):
-        super(Bottleneck, self).__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.conv3 = nn.Conv2d(planes, self.expansion*planes, kernel_size=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(self.expansion*planes)
+        self.inception_1x1 = BasicConv2d(nc_in, nc_1x1, kernel_size=1, stride=1)
 
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion*planes:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.expansion*planes)
-            )
+        self.inception_3x3_reduce = BasicConv2d(nc_in, nc_3x3_reduce, kernel_size=1)
+        self.inception_3x3 = BasicConv2d(nc_3x3_reduce, nc_3x3, kernel_size=3, stride=1, padding=1)
+
+        self.inception_double_3x3_reduce = BasicConv2d(nc_in, nc_double_3x3_reduce, kernel_size=1, stride=1)
+        self.inception_double_3x3_a = BasicConv2d(nc_double_3x3_reduce, nc_double_3x3_a, kernel_size=3, stride=1,
+                                                  padding=1)
+        self.inception_double_3x3_b = BasicConv2d(nc_double_3x3_a, nc_double_3x3_b, kernel_size=3, stride=1, padding=1)
+
+        # self.inception_pool = nn.AvgPool2d(kernel_size = 3, stride=1, padding=1)
+        self.inception_pool_conv = BasicConv2d(nc_in, nc_pool_conv, kernel_size=1, stride=1)
 
     def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = F.relu(self.bn2(self.conv2(out)))
-        out = self.bn3(self.conv3(out))
-        out += self.shortcut(x)
-        out = F.relu(out)
-        return out
+        x1 = self.inception_1x1(x)
+        # print('inception',x1.size())
+        x2 = self.inception_3x3_reduce(x)
+        x2 = self.inception_3x3(x2)
+        x3 = self.inception_double_3x3_reduce(x)
+        x3 = self.inception_double_3x3_a(x3)
+        x3 = self.inception_double_3x3_b(x3)
+        x4 = F.avg_pool2d(x, kernel_size=3, stride=1, padding=1)
+        x4 = self.inception_pool_conv(x4)
+        out = [x1, x2, x3, x4]
+        return torch.cat(out, 1)
 
 
-class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=10):
-        super(ResNet, self).__init__()
-        self.in_planes = 64
+class Inception_downsample(nn.Module):
+    def __init__(self, nc_in, nc_3x3_reduce, nc_3x3, nc_double_3x3_reduce, nc_double_3x3_a, nc_double_3x3_b):
+        super(Inception_downsample, self).__init__()
 
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
-        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
-        self.linear = nn.Linear(512*block.expansion, num_classes)
+        self.inception_3x3_reduce = BasicConv2d(nc_in, nc_3x3_reduce, kernel_size=1)
+        self.inception_3x3 = BasicConv2d(nc_3x3_reduce, nc_3x3, kernel_size=3, stride=2, padding=1)
 
-    def _make_layer(self, block, planes, num_blocks, stride):
-        strides = [stride] + [1]*(num_blocks-1)
-        layers = []
-        for stride in strides:
-            layers.append(block(self.in_planes, planes, stride))
-            self.in_planes = planes * block.expansion
-        return nn.Sequential(*layers)
+        self.inception_double_3x3_reduce = BasicConv2d(nc_in, nc_double_3x3_reduce, kernel_size=1, stride=1)
+        self.inception_double_3x3_a = BasicConv2d(nc_double_3x3_reduce, nc_double_3x3_a, kernel_size=3, stride=1,
+                                                  padding=1)
+        self.inception_double_3x3_b = BasicConv2d(nc_double_3x3_a, nc_double_3x3_b, kernel_size=3, stride=2, padding=1)
 
     def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
-        out = out.view(out.size(0), -1)
-        out = self.linear(out)
-        return out
+        x2 = self.inception_3x3_reduce(x)
+        x2 = self.inception_3x3(x2)
+        x3 = self.inception_double_3x3_reduce(x)
+        x3 = self.inception_double_3x3_a(x3)
+        x3 = self.inception_double_3x3_b(x3)
+        x4 = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
+        out = [x2, x3, x4]
+        return torch.cat(out, 1)
 
 
-def ResNet18():
-    return ResNet(BasicBlock, [2,2,2,2])
+class googlenet_bn(nn.Module):
+    def __init__(self, num_class=5000):
+        super(googlenet_bn, self).__init__()
+        # print('trace1')
+        self.conv1 = BasicConv2d(3, 64, kernel_size=7, stride=2, padding=3)
+        # print('trace2')
+        self.conv2_reduce = BasicConv2d(64, 64, kernel_size=1, stride=1)
+        self.conv2 = BasicConv2d(64, 192, kernel_size=3, stride=1, padding=1)
 
-def ResNet34():
-    return ResNet(BasicBlock, [3,4,6,3])
+        self.inception_3a = Inception(nc_in=192, nc_1x1=64, nc_3x3_reduce=64, nc_3x3=64, nc_double_3x3_reduce=64,
+                                      nc_double_3x3_a=96, nc_double_3x3_b=96, nc_pool_conv=32)
+        # print('trace3')
+        self.inception_3b = Inception(nc_in=256, nc_1x1=64, nc_3x3_reduce=64, nc_3x3=96, nc_double_3x3_reduce=64,
+                                      nc_double_3x3_a=96, nc_double_3x3_b=96, nc_pool_conv=64)
+        self.inception_3c = Inception_downsample(nc_in=320, nc_3x3_reduce=128, nc_3x3=160, nc_double_3x3_reduce=64,
+                                                 nc_double_3x3_a=96, nc_double_3x3_b=96)
+        self.inception_4a = Inception(nc_in=576, nc_1x1=224, nc_3x3_reduce=64, nc_3x3=96, nc_double_3x3_reduce=96,
+                                      nc_double_3x3_a=128, nc_double_3x3_b=128, nc_pool_conv=128)
+        self.inception_4b = Inception(nc_in=576, nc_1x1=192, nc_3x3_reduce=96, nc_3x3=128, nc_double_3x3_reduce=96,
+                                      nc_double_3x3_a=128, nc_double_3x3_b=128, nc_pool_conv=128)
+        self.inception_4c = Inception(nc_in=576, nc_1x1=160, nc_3x3_reduce=128, nc_3x3=160, nc_double_3x3_reduce=128,
+                                      nc_double_3x3_a=160, nc_double_3x3_b=160, nc_pool_conv=96)
+        self.inception_4d = Inception(nc_in=576, nc_1x1=96, nc_3x3_reduce=128, nc_3x3=192, nc_double_3x3_reduce=160,
+                                      nc_double_3x3_a=192, nc_double_3x3_b=192, nc_pool_conv=96)
+        self.inception_4e = Inception_downsample(nc_in=576, nc_3x3_reduce=128, nc_3x3=192, nc_double_3x3_reduce=192,
+                                                 nc_double_3x3_a=256, nc_double_3x3_b=256)
+        self.inception_5a = Inception(nc_in=1024, nc_1x1=352, nc_3x3_reduce=192, nc_3x3=320, nc_double_3x3_reduce=160,
+                                      nc_double_3x3_a=224, nc_double_3x3_b=224, nc_pool_conv=128)
+        self.inception_5b = Inception(nc_in=1024, nc_1x1=352, nc_3x3_reduce=192, nc_3x3=320, nc_double_3x3_reduce=192,
+                                      nc_double_3x3_a=224, nc_double_3x3_b=224, nc_pool_conv=128)
+        self.classifier = nn.Linear(1024, num_class)
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                init.kaiming_normal(m.weight.data, a=0, mode='fan_in')
 
-def ResNet50():
-    return ResNet(Bottleneck, [3,4,6,3])
-
-def ResNet101():
-    return ResNet(Bottleneck, [3,4,23,3])
-
-def ResNet152():
-    return ResNet(Bottleneck, [3,8,36,3])
-
-
-def test():
-    net = ResNet18()
-    y = net(Variable(torch.randn(1,3,32,32)))
-    print(y.size())
-
-# test()
+    def forward(self, x):
+        # print('x',x.size)
+        x = self.conv1(x)
+        # print('conv1',x.size())
+        x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
+        # print('maxpool1',x.size())
+        x = self.conv2_reduce(x)
+        x = self.conv2(x)
+        # print('conv2',x.size())
+        x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
+        # print('maxpool2',x.size())
+        x = self.inception_3a(x)
+        x = self.inception_3b(x)
+        x = self.inception_3c(x)
+        # print('inception3',x.size())
+        x = self.inception_4a(x)
+        x = self.inception_4b(x)
+        x = self.inception_4c(x)
+        x = self.inception_4d(x)
+        x = self.inception_4e(x)
+        # print('inception4',x.size())
+        x = self.inception_5a(x)
+        x = self.inception_5b(x)
+        # print('inception5',x.size())
+        x = F.avg_pool2d(x, kernel_size=7, stride=1)
+        x = x.squeeze()
+        # print('avgpool',x.size())
+        x = self.classifier(x)
+        return x
