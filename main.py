@@ -12,7 +12,7 @@ import torchvision.transforms as transforms
 
 import os
 import argparse
-from resnext import * # import model file
+from Inception_v4 import * # import model file
 from data import *
 from utils import progress_bar # calculate time using
 from torch.autograd import Variable
@@ -30,17 +30,8 @@ best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
 # Model
-if args.resume:
-    # Load checkpoint.
-    print('==> Resuming from checkpoint..')
-    assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load('./checkpoint/ckpt.t7')
-    net.load_state_dict(checkpoint['net'])
-    best_acc = checkpoint['acc']
-    start_epoch = checkpoint['epoch']
-else:
-    print('==> Building model..')
-    net = resnext101() # load model
+print('==> Building model..')
+net = inceptionv4() # load model
 
 # print(device)
 if device == 'cuda':
@@ -49,17 +40,27 @@ if device == 'cuda':
         net, device_ids=range(torch.cuda.device_count()))
     cudnn.benchmark = True
 
+if args.resume:
+    # Load checkpoint.
+    print('==> Resuming from checkpoint..')
+    assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
+    checkpoint = torch.load('./checkpoint/ckpt.t7')
+    net.load_state_dict(checkpoint['net'])
+    best_acc = checkpoint['acc']
+    start_epoch = checkpoint['epoch']
+
+
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
 # Data
 TRAIN_LIST_PATH = './info/train_filelist_all.txt'
 VALID_LIST_PATH = './info/val_filelist.txt'
-BATCH_SZIE = 128 # Batch Size
+BATCH_SZIE = 256 # Batch Size
 
 print('==> Preparing data..')
 transform_train = transforms.Compose([
-    transforms.Resize((340, 340)),
+    transforms.Resize(342),
     transforms.RandomResizedCrop(299),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
@@ -67,7 +68,8 @@ transform_train = transforms.Compose([
 ])
 
 transform_test = transforms.Compose([
-    transforms.Resize((299, 299)),
+    transforms.Resize(342),
+    transforms.CenterCrop(299),
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
 ])
@@ -80,11 +82,18 @@ testset = webvisionData(VALID_LIST_PATH, 'valid', transform_test)
 testloader = torch.utils.data.DataLoader(
     testset, batch_size=BATCH_SZIE, shuffle=True, num_workers=64)
 
-classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-
 # learning rate decay
 def adjust_learning_rate(epoch):
-    lr = args.lr * (0.1 ** (epoch // 2))
+    lr = args.lr
+    if epoch > 4:
+        lr = lr / 10.0
+    if epoch > 7:
+        lr = lr / 10.0
+    if epoch > 9:
+        lr = lr / 10.0
+    if epoch > 10:
+        lr = lr / 10.0
+
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -150,7 +159,7 @@ def test(epoch):
         best_acc = acc
 
 
-for epoch in range(start_epoch, start_epoch+8):
+for epoch in range(start_epoch, 12):
     adjust_learning_rate(epoch)
     train(epoch)
     test(epoch)
