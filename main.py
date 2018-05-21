@@ -12,7 +12,7 @@ import torchvision.transforms as transforms
 
 import os
 import argparse
-from Inception_v4 import * # import model file
+from resnext import * # import model file
 from data import *
 from utils import progress_bar # calculate time using
 from torch.autograd import Variable
@@ -31,7 +31,7 @@ start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
 # Model
 print('==> Building model..')
-net = inceptionv4() # load model
+net = resnext101() # load model
 
 # print(device)
 if device == 'cuda':
@@ -56,11 +56,10 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5
 # Data
 TRAIN_LIST_PATH = './info/train_filelist_all.txt'
 VALID_LIST_PATH = './info/val_filelist.txt'
-BATCH_SZIE = 256 # Batch Size
+BATCH_SZIE = 128 # Batch Size
 
 print('==> Preparing data..')
 transform_train = transforms.Compose([
-    transforms.Resize(342),
     transforms.RandomResizedCrop(299),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
